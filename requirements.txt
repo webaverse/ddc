@@ -1,0 +1,12 @@
+tensorflow==0.12.1
+numpy==1.11.2
+tqdm
+scipy==0.18.1
+flask==1.1.2
+essentia
+# setuptools==44.1.1
+# librosa
+# librosa==0.5.1
+# joblib==0.11
+# conda create -n ddc python=2.7
+# essentia="https://github.com/MTG/essentia/releases/tag/v2.1_beta3"
