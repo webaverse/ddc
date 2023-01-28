@@ -244,30 +244,33 @@ def create_chart_dir(
         bpm=_BPM,
         charts='\n'.join(diff_chart_txts))
 
-    print 'Saving to {}'.format(out_dir)
-    try:
-        if not os.path.isdir(out_dir):
-            os.mkdir(out_dir)
-        audio_out_fp = os.path.join(out_dir, audio_out_name)
-        if not os.path.exists(audio_out_fp):
-            shutil.copyfile(audio_fp, audio_out_fp)
-        with open(os.path.join(out_dir, out_dir_name + '.sm'), 'w') as f:
-            f.write(sm_txt)
-    except:
-        raise CreateChartException('Error during output')
+    return sm_txt
 
-    if delete_audio:
-        try:
-            os.remove(audio_fp)
-        except:
-            raise CreateChartException('Error deleting audio')
+    # print 'Saving to {}'.format(out_dir)
+    # try:
+    #     if not os.path.isdir(out_dir):
+    #         os.mkdir(out_dir)
+    #     audio_out_fp = os.path.join(out_dir, audio_out_name)
+    #     if not os.path.exists(audio_out_fp):
+    #         shutil.copyfile(audio_fp, audio_out_fp)
+    #     with open(os.path.join(out_dir, out_dir_name + '.sm'), 'w') as f:
+    #         f.write(sm_txt)
+    # except:
+    #     raise CreateChartException('Error during output')
 
-    return True
+    # if delete_audio:
+    #     try:
+    #         os.remove(audio_fp)
+    #     except:
+    #         raise CreateChartException('Error deleting audio')
+
+    # return True
 
 
 import tempfile
 
 from flask import Flask, jsonify, request, send_from_directory, send_file
+import flask
 
 _FRONTEND_DIST_DIR = 'frontend'
 app = Flask(
@@ -281,8 +284,21 @@ def index():
     return send_from_directory(_FRONTEND_DIST_DIR, 'index.html')
 
 
-@app.route('/choreograph', methods=['POST'])
+@app.route('/choreograph', methods=['POST', 'OPTIONS'])
 def choreograph():
+    if (request.method == 'OPTIONS'):
+        # print('got options 1')
+        response = flask.Response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = '*'
+        response.headers['Access-Control-Expose-Headers'] = '*'
+        response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+        response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
+        response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+        # print('got options 2')
+        return response
+
     uploaded_file = request.files.get('audio_file')
     if uploaded_file is None or len(uploaded_file.filename) == 0:
         return 'Audio file required', 400
@@ -291,8 +307,10 @@ def choreograph():
     except:
         uploaded_file_ext = ''
 
-    song_artist = request.form.get('song_artist', '')[:1024]
-    song_title = request.form.get('song_title', '')[:1024]
+    # song_artist = request.form.get('song_artist', '')[:1024]
+    # song_title = request.form.get('song_title', '')[:1024]
+    song_artist = ''
+    song_title = ''
     diff_coarse = request.form.get('diff_coarse')
     if diff_coarse is None:
         return 'Need to specify difficulty', 400
@@ -300,49 +318,46 @@ def choreograph():
         return 'Invalid difficulty specified', 400
 
     out_dir = tempfile.mkdtemp()
-    with tempfile.NamedTemporaryFile(suffix='.zip') as z:
-        song_id = uuid.uuid4()
+    # with tempfile.NamedTemporaryFile(suffix='.zip') as z:
+    song_id = uuid.uuid4()
 
-        song_fp = os.path.join(out_dir, '{}{}'.format(str(song_id), uploaded_file_ext))
-        uploaded_file.save(song_fp)
+    song_fp = os.path.join(out_dir, '{}{}'.format(str(song_id), uploaded_file_ext))
+    uploaded_file.save(song_fp)
 
-        try:
-            create_chart_dir(
-                song_artist, song_title,
-                song_fp,
-                NORM, ANALYZERS,
-                SESS,
-                SP_MODEL, ARGS.sp_batch_size,
-                [diff_coarse],
-                SS_MODEL, IDX_TO_LABEL,
-                out_dir)
-        except CreateChartException as e:
-            if str(e).startswith('Invalid audio file'):
-                return 'Invalid audio file', 400
-            shutil.rmtree(out_dir)
-            print e
-            return 'Unknown error', 500
-        except Exception as e:
-            shutil.rmtree(out_dir)
-            print e
-            return 'Unknown error', 500
-
-        print 'Creating zip {}'.format(z.name)
-        with zipfile.ZipFile(z.name, 'w', zipfile.ZIP_DEFLATED) as f:
-            for fn in os.listdir(out_dir):
-                f.write(
-                    os.path.join(out_dir, fn),
-                    os.path.join(
-                        _PACK_NAME,
-                        str(song_id),
-                        '{}{}'.format(str(song_id), os.path.splitext(fn)[1])))
-
+    sm_txt = ''
+    try:
+        sm_txt = create_chart_dir(
+            song_artist, song_title,
+            song_fp,
+            NORM, ANALYZERS,
+            SESS,
+            SP_MODEL, ARGS.sp_batch_size,
+            [diff_coarse],
+            SS_MODEL, IDX_TO_LABEL,
+            out_dir)
         shutil.rmtree(out_dir)
+    except CreateChartException as e:
+        if str(e).startswith('Invalid audio file'):
+            return 'Invalid audio file', 400
+        shutil.rmtree(out_dir)
+        print e
+        return 'Unknown error', 500
+    except Exception as e:
+        shutil.rmtree(out_dir)
+        print e
+        return 'Unknown error', 500
 
-        return send_file(
-                z.name,
-                as_attachment=True,
-                attachment_filename='{}.zip'.format(song_id))
+    response = flask.Response(sm_txt)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = '*'
+    response.headers['Access-Control-Expose-Headers'] = '*'
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
+    response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+    return response
+
+        
 
 
 @app.after_request
@@ -415,4 +430,4 @@ if __name__ == '__main__':
 
     if ARGS.max_file_size is not None:
         app.config['MAX_CONTENT_LENGTH'] = ARGS.max_file_size
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 80)))
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 3456)))
