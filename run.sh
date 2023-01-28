@@ -3,3 +3,4 @@
 
 pushd infer
 python ddc_server.py
+popd
