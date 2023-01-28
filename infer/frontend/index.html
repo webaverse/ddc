@@ -80,17 +80,17 @@ Thanks to <a href="https://fra.xtil.net">Fraxtil</a> whose <a href="https://fra.
     xhr.onload = function(oevt) {
       if (xhr.status === 200) {
         var blob = xhr.response;
-        var contentDispo = xhr.getResponseHeader("Content-Disposition");
+        // var contentDispo = xhr.getResponseHeader("Content-Disposition");
         // https://stackoverflow.com/a/23054920/
-        var fileName = contentDispo.match(
-          /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
-        )[1];
+        // var fileName = contentDispo.match(
+        //   /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+        // )[1];
         var a = document.createElement("a");
         a.style = "display: none";
         document.body.appendChild(a);
         var url = window.URL.createObjectURL(blob);
         a.href = url;
-        a.download = fileName;
+        a.download = 'song.sm';
         a.dispatchEvent(new MouseEvent("click"));
         window.URL.revokeObjectURL(url);
       } else if (xhr.status === 400) {
